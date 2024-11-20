@@ -10,7 +10,6 @@ st.title("Análisis de Impacto de Fuentes de Oportunidades")
 # Cargar datos
 @st.cache
 def load_data(file_path):
-    # Leer el archivo procesado
     data = pd.read_csv(file_path, encoding='latin1')
     return data
 
@@ -22,8 +21,23 @@ st.header("Datos Cargados")
 st.write("Vista previa de los datos:")
 st.write(data.head())
 
-st.write("Columnas en los datos cargados:")
-st.write(data.columns.tolist())
+# Distribución de oportunidades por unidad de negocio
+st.header("Distribución de Oportunidades por Unidad de Negocio")
+unit_counts = data['Unidad de negocio asignada_Enterprise Solutions'].value_counts()
+unit_labels = ['Enterprise Solutions', 'Cloud & AI Solutions']
+fig_units, ax_units = plt.subplots()
+ax_units.pie(unit_counts, labels=unit_labels, autopct='%1.1f%%', startangle=90)
+ax_units.set_title("Distribución por Unidad de Negocio")
+st.pyplot(fig_units)
+
+# Proporción de oportunidades ganadas vs. no ganadas
+st.header("Proporción de Oportunidades Ganadas vs. No Ganadas")
+outcome_counts = data['etapa_binaria'].value_counts()
+outcome_labels = ['No Ganado', 'Ganado']
+fig_outcomes, ax_outcomes = plt.subplots()
+ax_outcomes.pie(outcome_counts, labels=outcome_labels, autopct='%1.1f%%', startangle=90, colors=['red', 'green'])
+ax_outcomes.set_title("Proporción de Resultados")
+st.pyplot(fig_outcomes)
 
 # Seleccionar variables independientes (todas las columnas dummy relacionadas)
 X = data[[col for col in data.columns if 'Fuente original de trafico' in col or 'Unidad de negocio asignada' in col]]
@@ -73,4 +87,17 @@ if not significant_params.empty:
     st.write(f"El impacto de **{selected_variable}** en la probabilidad de 'ganado' es: **{impact_value:.2f}**")
 else:
     st.write("No hay variables significativas para explorar.")
+
+# Comparación de fuentes de tráfico
+st.header("Comparación de Fuentes de Tráfico")
+traffic_columns = [col for col in data.columns if 'Fuente original de trafico' in col]
+traffic_counts = data[traffic_columns].sum()
+fig_traffic, ax_traffic = plt.subplots(figsize=(10, 6))
+traffic_counts.sort_values().plot(kind='bar', ax=ax_traffic, color='skyblue', edgecolor='black')
+ax_traffic.set_title("Número de Oportunidades por Fuente de Tráfico")
+ax_traffic.set_ylabel("Cantidad")
+ax_traffic.set_xlabel("Fuente de Tráfico")
+plt.xticks(rotation=45, ha='right')
+st.pyplot(fig_traffic)
+
 
