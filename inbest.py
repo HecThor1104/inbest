@@ -25,7 +25,6 @@ plt.rcParams.update({
 
 # Título del dashboard
 st.markdown("<h1 style='text-align: center; color: #4A4A4A;'>🎯 Análisis de Impacto de Fuentes de Oportunidades</h1>", unsafe_allow_html=True)
-st.markdown("**Este dashboard interactivo permite explorar las fuentes de tráfico y su impacto en los resultados de oportunidades.**")
 
 # Cargar datos
 @st.cache
@@ -51,24 +50,24 @@ if "Cloud & AI Solutions" not in unit_filter:
 if "Enterprise Solutions" not in unit_filter:
     data = data[data['Unidad de negocio asignada_Enterprise Solutions'] == 0]
 
-# Métricas principales
-st.markdown("### 📈 Métricas Generales")
-col1, col2, col3 = st.columns(3)
-total_opportunities = len(data)
-won_opportunities = data['etapa_binaria'].sum()
-conversion_rate = (won_opportunities / total_opportunities) * 100 if total_opportunities > 0 else 0
-col1.metric("Total de Oportunidades", total_opportunities)
-col2.metric("Oportunidades Ganadas", won_opportunities)
-col3.metric("Tasa de Conversión", f"{conversion_rate:.1f} %")
+# Gráfico de pastel: Distribución de unidades de negocio
+st.markdown("### 🏢 Distribución de Oportunidades por Unidad de Negocio")
+unit_counts = data['Unidad de negocio asignada_Enterprise Solutions'].value_counts()
+unit_labels = ['Enterprise Solutions', 'Cloud & AI Solutions']
+colors = ['#2E86C1', '#AED6F1']
+fig_units, ax_units = plt.subplots()
+ax_units.pie(unit_counts, labels=unit_labels, autopct='%1.1f%%', startangle=90, colors=colors)
+ax_units.set_title("Distribución por Unidad de Negocio", fontsize=16)
+st.pyplot(fig_units)
 
 # Gráfico de pastel: Proporción de resultados
-st.markdown("### ✅ Proporción de Resultados")
+st.markdown("### ✅ Proporción de Oportunidades Ganadas vs. No Ganadas")
 outcome_counts = data['etapa_binaria'].value_counts()
 outcome_labels = ['No Ganado', 'Ganado']
 fig_outcomes = px.pie(
     names=outcome_labels,
     values=outcome_counts,
-    title="Proporción de Oportunidades Ganadas vs. No Ganadas",
+    title="Proporción de Resultados",
     color=outcome_labels,
     color_discrete_map={"Ganado": "#2ECC71", "No Ganado": "#E74C3C"}
 )
@@ -101,21 +100,16 @@ logit_pred_probs = logit_model.predict(X)
 fpr, tpr, thresholds = roc_curve(y, logit_pred_probs)
 roc_auc = auc(fpr, tpr)
 
-fig_roc = px.area(
-    x=fpr,
-    y=tpr,
-    title=f"Curva ROC (AUC = {roc_auc:.2f})",
-    labels={"x": "False Positive Rate", "y": "True Positive Rate"},
-    color_discrete_sequence=["#1ABC9C"]
-)
-fig_roc.add_shape(
-    type="line",
-    x0=0, y0=0, x1=1, y1=1,
-    line=dict(color="gray", dash="dash")
-)
-st.plotly_chart(fig_roc, use_container_width=True)
+fig_roc, ax_roc = plt.subplots()
+sns.lineplot(x=fpr, y=tpr, label=f'ROC curve (area = {roc_auc:.2f})', ax=ax_roc, color="#1ABC9C")
+ax_roc.plot([0, 1], [0, 1], 'k--', label='Random guess', color="gray")
+ax_roc.set_xlabel('False Positive Rate', fontsize=14)
+ax_roc.set_ylabel('True Positive Rate', fontsize=14)
+ax_roc.set_title('Curva ROC - Modelo Logit', fontsize=16)
+ax_roc.legend(loc="lower right")
+st.pyplot(fig_roc)
 
-# Gráfico de barras: Oportunidades por fuente de tráfico
+# Gráfico de barras: Comparación de fuentes de tráfico
 st.markdown("### 🌐 Comparación de Fuentes de Tráfico")
 traffic_columns = [col for col in data.columns if 'Fuente original de trafico' in col]
 traffic_counts = data[traffic_columns].sum()
@@ -129,11 +123,14 @@ fig_traffic = px.bar(
 )
 st.plotly_chart(fig_traffic, use_container_width=True)
 
-# Información adicional
-st.markdown("### ℹ️ Información Adicional")
-st.write("""
-Este dashboard permite analizar las oportunidades generadas por diferentes fuentes de tráfico y unidades de negocio.
-Interactúa con los gráficos para obtener más información.
-""")
+# Exploración interactiva de variables
+st.markdown("### 🔍 Exploración de Impacto de Variables")
+if not significant_params.empty:
+    selected_variable = st.selectbox("Selecciona una variable", significant_params.index)
+    impact_value = significant_params[selected_variable]
+    st.markdown(f"**El impacto de `{selected_variable}` en la probabilidad de 'ganado' es:** `{impact_value:.2f}`")
+else:
+    st.write("No hay variables significativas para explorar.")
+
 
 
