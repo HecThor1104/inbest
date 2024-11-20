@@ -2,39 +2,16 @@ import streamlit as st
 import pandas as pd
 import altair as alt
 import plotly.express as px
-import matplotlib.pyplot as plt
 
 # Configuración de la página
 st.set_page_config(
     page_title="Análisis de Oportunidades",
     page_icon="📊",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# CSS personalizado
-st.markdown("""
-    <style>
-        [data-testid="stSidebar"] {
-            background-color: #f8f9fa;
-        }
-        .main-title {
-            text-align: center;
-            font-size: 2rem;
-            font-weight: bold;
-            color: #4a4a4a;
-        }
-        .section-header {
-            font-size: 1.5rem;
-            color: #5a5a5a;
-            font-weight: bold;
-            margin-bottom: 10px;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
 # Título del dashboard
-st.markdown('<div class="main-title">📊 Análisis Visual de Fuentes de Oportunidades</div>', unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #4A4A4A;'>📊 Análisis de Oportunidades</h1>", unsafe_allow_html=True)
 
 # Cargar datos
 @st.cache
@@ -45,34 +22,33 @@ def load_data(file_path):
 file_path = "bd_processed.csv"  # Cambia si necesitas otro archivo
 data = load_data(file_path)
 
-# Sidebar interactivo
-st.sidebar.header("Filtros")
+# Filtros de unidades de negocio
+st.markdown("### Selecciona Unidades de Negocio")
 units = ['Cloud & AI Solutions', 'Enterprise Solutions']
-unit_filter = st.sidebar.multiselect(
-    "Selecciona Unidades de Negocio",
+unit_filter = st.multiselect(
+    "Filtra las unidades de negocio a analizar",
     options=units,
     default=units
 )
 
-# Filtrar datos según selección
+# Aplicar filtros
 if "Cloud & AI Solutions" not in unit_filter:
     data = data[data['Unidad de negocio asignada_Enterprise Solutions'] == 1]
 if "Enterprise Solutions" not in unit_filter:
     data = data[data['Unidad de negocio asignada_Enterprise Solutions'] == 0]
 
-# Métricas
-st.markdown('<div class="section-header">📈 Métricas Principales</div>', unsafe_allow_html=True)
+# Métricas principales
+st.markdown("### 📈 Métricas Generales")
 col1, col2, col3 = st.columns(3)
-
 total_opportunities = len(data)
 won_opportunities = data['etapa_binaria'].sum()
 conversion_rate = (won_opportunities / total_opportunities) * 100 if total_opportunities > 0 else 0
-
 col1.metric("Total de Oportunidades", total_opportunities)
-col2.metric("Oportunidades Ganadas", won_opportunities, f"{conversion_rate:.1f}%")
+col2.metric("Oportunidades Ganadas", won_opportunities)
+col3.metric("Tasa de Conversión", f"{conversion_rate:.1f} %")
 
-# Visualización: Proporción de Oportunidades Ganadas
-st.markdown('<div class="section-header">✅ Proporción de Resultados</div>', unsafe_allow_html=True)
+# Gráfico de pastel: Proporción de resultados
+st.markdown("### ✅ Proporción de Resultados")
 outcome_counts = data['etapa_binaria'].value_counts()
 outcome_labels = ['No Ganado', 'Ganado']
 fig_outcomes = px.pie(
@@ -84,23 +60,23 @@ fig_outcomes = px.pie(
 )
 st.plotly_chart(fig_outcomes, use_container_width=True)
 
-# Visualización: Oportunidades por Fuente de Tráfico
-st.markdown('<div class="section-header">🌐 Oportunidades por Fuente de Tráfico</div>', unsafe_allow_html=True)
+# Gráfico de barras: Oportunidades por fuente de tráfico
+st.markdown("### 🌐 Distribución por Fuentes de Tráfico")
 traffic_columns = [col for col in data.columns if 'Fuente original de trafico' in col]
 traffic_counts = data[traffic_columns].sum()
 fig_traffic = px.bar(
     x=traffic_counts.index,
     y=traffic_counts.values,
-    title="Distribución por Fuentes de Tráfico",
+    title="Número de Oportunidades por Fuente de Tráfico",
     labels={"x": "Fuente", "y": "Cantidad"},
     color=traffic_counts.index,
     color_discrete_sequence=px.colors.qualitative.Set2
 )
 st.plotly_chart(fig_traffic, use_container_width=True)
 
-# Gráfico de métricas avanzadas (Altair)
-st.markdown('<div class="section-header">📊 Análisis Temporal de Fuentes</div>', unsafe_allow_html=True)
+# Gráfico de líneas: Análisis temporal
 if "Fecha de creacion" in data.columns:
+    st.markdown("### 📊 Tendencias Temporales")
     data['Fecha de creacion'] = pd.to_datetime(data['Fecha de creacion'], errors='coerce')
     data['Mes'] = data['Fecha de creacion'].dt.to_period('M')
     monthly_data = data.groupby(['Mes'])[traffic_columns].sum().reset_index()
@@ -116,11 +92,11 @@ if "Fecha de creacion" in data.columns:
     )
     st.altair_chart(chart, use_container_width=True)
 
-# Información adicional
-st.sidebar.header("Acerca del Dashboard")
-st.sidebar.write("""
-Este dashboard muestra un análisis detallado de las oportunidades generadas por diferentes fuentes de tráfico y unidades de negocio.
-- Interactúa con los filtros en la barra lateral.
-- Explora las métricas clave y gráficos dinámicos.
+# Análisis adicional o información contextual
+st.markdown("### ℹ️ Información Adicional")
+st.write("""
+Este dashboard permite analizar las oportunidades generadas por diferentes fuentes de tráfico y unidades de negocio.
+Interacciona con los gráficos para obtener más información.
 """)
+
 
