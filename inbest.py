@@ -16,7 +16,7 @@ def load_data(file_path):
     data_dummies = pd.get_dummies(data, columns=categorical_columns, drop_first=True)
     return data, data_dummies
 
-file_path = "bd_processed"  # Cambia esto según tu archivo
+file_path = "bd_processed.csv"  # Cambia esto según tu archivo
 data, data_dummies = load_data(file_path)
 
 # Resumen descriptivo
