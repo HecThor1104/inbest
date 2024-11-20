@@ -5,6 +5,7 @@ from sklearn.metrics import roc_curve, auc
 import statsmodels.api as sm
 import seaborn as sns
 import plotly.express as px
+import altair as alt
 
 # Configuración de la página
 st.set_page_config(
@@ -50,15 +51,33 @@ if "Cloud & AI Solutions" not in unit_filter:
 if "Enterprise Solutions" not in unit_filter:
     data = data[data['Unidad de negocio asignada_Enterprise Solutions'] == 0]
 
+# Métricas principales
+st.markdown("### 📈 Métricas Generales")
+col1, col2, col3 = st.columns(3)
+total_opportunities = len(data)
+won_opportunities = data['etapa_binaria'].sum()
+conversion_rate = (won_opportunities / total_opportunities) * 100 if total_opportunities > 0 else 0
+col1.metric("Total de Oportunidades", total_opportunities)
+col2.metric("Oportunidades Ganadas", won_opportunities)
+col3.metric("Tasa de Conversión", f"{conversion_rate:.1f} %")
+
 # Gráfico de pastel: Distribución de unidades de negocio
 st.markdown("### 🏢 Distribución de Oportunidades por Unidad de Negocio")
-unit_counts = data['Unidad de negocio asignada_Enterprise Solutions'].value_counts()
-unit_labels = ['Enterprise Solutions', 'Cloud & AI Solutions']
-colors = ['#2E86C1', '#AED6F1']
-fig_units, ax_units = plt.subplots()
-ax_units.pie(unit_counts, labels=unit_labels, autopct='%1.1f%%', startangle=90, colors=colors)
-ax_units.set_title("Distribución por Unidad de Negocio", fontsize=16)
-st.pyplot(fig_units)
+unit_counts = {
+    "Cloud & AI Solutions": len(data[data['Unidad de negocio asignada_Enterprise Solutions'] == 0]),
+    "Enterprise Solutions": len(data[data['Unidad de negocio asignada_Enterprise Solutions'] == 1]),
+}
+fig_units = px.pie(
+    names=list(unit_counts.keys()),
+    values=list(unit_counts.values()),
+    title="Distribución de Oportunidades por Unidad de Negocio",
+    color=list(unit_counts.keys()),
+    color_discrete_map={
+        "Cloud & AI Solutions": "#AED6F1",
+        "Enterprise Solutions": "#2E86C1"
+    }
+)
+st.plotly_chart(fig_units, use_container_width=True)
 
 # Gráfico de pastel: Proporción de resultados
 st.markdown("### ✅ Proporción de Oportunidades Ganadas vs. No Ganadas")
@@ -72,6 +91,25 @@ fig_outcomes = px.pie(
     color_discrete_map={"Ganado": "#2ECC71", "No Ganado": "#E74C3C"}
 )
 st.plotly_chart(fig_outcomes, use_container_width=True)
+
+# Gráfico de líneas: Tendencias temporales
+if "Fecha de creacion" in data.columns:
+    st.markdown("### 📊 Tendencias Mensuales por Fuente de Tráfico")
+    data['Fecha de creacion'] = pd.to_datetime(data['Fecha de creacion'], errors='coerce')
+    data['Mes'] = data['Fecha de creacion'].dt.to_period('M')
+    monthly_data = data.groupby(['Mes'])[[
+        col for col in data.columns if 'Fuente original de trafico' in col]].sum().reset_index()
+    monthly_data['Mes'] = monthly_data['Mes'].astype(str)
+    chart = alt.Chart(monthly_data.melt(id_vars=['Mes'], var_name='Fuente', value_name='Oportunidades')).mark_line().encode(
+        x='Mes:T',
+        y='Oportunidades:Q',
+        color='Fuente:N'
+    ).properties(
+        title="Tendencia Mensual de Oportunidades por Fuente",
+        width=800,
+        height=400
+    )
+    st.altair_chart(chart, use_container_width=True)
 
 # Modelo logit y coeficientes
 X = data[[col for col in data.columns if 'Fuente original de trafico' in col or 'Unidad de negocio asignada' in col]]
@@ -131,6 +169,7 @@ if not significant_params.empty:
     st.markdown(f"**El impacto de `{selected_variable}` en la probabilidad de 'ganado' es:** `{impact_value:.2f}`")
 else:
     st.write("No hay variables significativas para explorar.")
+
 
 
 
