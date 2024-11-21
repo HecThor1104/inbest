@@ -41,6 +41,11 @@ data = load_data(file_path)
 def clean_column_names(columns):
     return [col.split('_')[-1].replace("ñ", "ñ") for col in columns]
 
+# Vista previa de los datos
+st.markdown("### 🗂️ Vista Previa de los Datos")
+st.write("En esta sección, puedes explorar los datos cargados para entender mejor el contenido del análisis.")
+st.dataframe(data.head(10), use_container_width=True)
+
 # Filtros de unidades de negocio
 st.markdown("### Selecciona Unidades de Negocio")
 units = ['Cloud & AI Solutions', 'Enterprise Solutions']
@@ -58,6 +63,7 @@ if "Enterprise Solutions" not in unit_filter:
 
 # Métricas principales
 st.markdown("### 📈 Métricas Generales")
+st.write("Aquí se presentan los valores clave que resumen las oportunidades procesadas.")
 col1, col2, col3 = st.columns(3)
 total_opportunities = len(data)
 won_opportunities = data['etapa_binaria'].sum()
@@ -68,6 +74,7 @@ col3.metric("Tasa de Conversión", f"{conversion_rate:.1f} %")
 
 # Gráfico de pastel: Distribución de unidades de negocio
 st.markdown("### 🏢 Distribución de Oportunidades por Unidad de Negocio")
+st.write("Este gráfico muestra cómo se distribuyen las oportunidades entre las distintas unidades de negocio.")
 unit_counts = {
     "Cloud & AI Solutions": len(data[data['Unidad de negocio asignada_Enterprise Solutions'] == 0]),
     "Enterprise Solutions": len(data[data['Unidad de negocio asignada_Enterprise Solutions'] == 1]),
@@ -86,6 +93,7 @@ st.plotly_chart(fig_units, use_container_width=True)
 
 # Gráfico de pastel: Proporción de resultados
 st.markdown("### ✅ Proporción de Oportunidades Ganadas vs. No Ganadas")
+st.write("Este gráfico ilustra la proporción de oportunidades que han sido ganadas frente a las no ganadas.")
 outcome_counts = data['etapa_binaria'].value_counts()
 outcome_labels = ['No Ganado', 'Ganado']
 fig_outcomes = px.pie(
@@ -99,6 +107,7 @@ st.plotly_chart(fig_outcomes, use_container_width=True)
 
 # Gráfico de barras: Comparación de fuentes de tráfico
 st.markdown("### 🌐 Comparación de Fuentes de Tráfico")
+st.write("Este gráfico compara la cantidad de oportunidades generadas por cada fuente de tráfico.")
 traffic_columns = [col for col in data.columns if 'Fuente original de trafico' in col]
 traffic_counts = data[traffic_columns].sum()
 cleaned_labels = clean_column_names(traffic_columns)
@@ -112,6 +121,27 @@ fig_traffic = px.bar(
 )
 st.plotly_chart(fig_traffic, use_container_width=True)
 
+# Gráfico de líneas: Tendencias temporales
+if "Fecha de creacion" in data.columns:
+    st.markdown("### 📊 Tendencias Mensuales por Fuente de Tráfico")
+    st.write("Este gráfico de líneas muestra la evolución mensual de las oportunidades por cada fuente de tráfico.")
+    data['Fecha de creacion'] = pd.to_datetime(data['Fecha de creacion'], errors='coerce')
+    data['Mes'] = data['Fecha de creacion'].dt.to_period('M')
+    monthly_data = data.groupby(['Mes'])[traffic_columns].sum().reset_index()
+    monthly_data['Mes'] = monthly_data['Mes'].astype(str)
+    melted_monthly_data = monthly_data.melt(id_vars=['Mes'], var_name='Fuente', value_name='Oportunidades')
+    melted_monthly_data['Fuente'] = clean_column_names(melted_monthly_data['Fuente'])
+    chart = alt.Chart(melted_monthly_data).mark_line().encode(
+        x='Mes:T',
+        y='Oportunidades:Q',
+        color='Fuente:N'
+    ).properties(
+        title="Tendencia Mensual de Oportunidades por Fuente",
+        width=800,
+        height=400
+    )
+    st.altair_chart(chart, use_container_width=True)
+
 # Modelo logit y coeficientes
 X = data[[col for col in data.columns if 'Fuente original de trafico' in col or 'Unidad de negocio asignada' in col]]
 X = sm.add_constant(X)
@@ -120,8 +150,9 @@ logit_model = sm.Logit(y, X).fit(disp=False)
 logit_params = logit_model.params
 logit_pvalues = logit_model.pvalues
 
-# Gráfico de coeficientes significativos (diseño moderno con Plotly)
+# Gráfico de coeficientes significativos
 st.markdown("### 📈 Coeficientes Significativos del Modelo Logit")
+st.write("Este gráfico muestra las variables que tienen un impacto significativo en la probabilidad de que una oportunidad sea ganada.")
 significant_params = logit_params[logit_pvalues < 0.05].drop('const', errors='ignore')
 if not significant_params.empty:
     cleaned_significant_labels = clean_column_names(significant_params.index)
@@ -139,8 +170,9 @@ if not significant_params.empty:
 else:
     st.write("No hay coeficientes significativos en el modelo.")
 
-# Curva ROC (diseño moderno con Plotly)
+# Curva ROC
 st.markdown("### 📉 Curva ROC del Modelo Logit")
+st.write("La curva ROC muestra la capacidad del modelo para discriminar entre oportunidades ganadas y no ganadas.")
 logit_pred_probs = logit_model.predict(X)
 fpr, tpr, thresholds = roc_curve(y, logit_pred_probs)
 roc_auc = auc(fpr, tpr)
@@ -150,8 +182,8 @@ fig_roc.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f'ROC Curve (AUC =
 fig_roc.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name="Random Guess", line=dict(color="gray", dash='dash')))
 fig_roc.update_layout(
     title="Curva ROC - Modelo Logit",
-    xaxis_title="False Positive Rate",
-    yaxis_title="True Positive Rate",
+    xaxis_title="Tasa de Falsos Positivos",
+    yaxis_title="Tasa de Verdaderos Positivos",
     legend=dict(x=0.8, y=0.2),
     template="plotly_white"
 )
@@ -159,12 +191,14 @@ st.plotly_chart(fig_roc, use_container_width=True)
 
 # Exploración interactiva de variables
 st.markdown("### 🔍 Exploración de Impacto de Variables")
+st.write("En esta sección puedes explorar cómo impactan las variables significativas en el modelo.")
 if not significant_params.empty:
     selected_variable = st.selectbox("Selecciona una variable", significant_params.index)
     impact_value = significant_params[selected_variable]
     st.markdown(f"**El impacto de `{selected_variable}` en la probabilidad de 'ganado' es:** `{impact_value:.2f}`")
 else:
     st.write("No hay variables significativas para explorar.")
+
 
 
 
