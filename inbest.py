@@ -122,7 +122,7 @@ logit_pvalues = logit_model.pvalues
 
 # Gráfico de coeficientes significativos (diseño moderno con Plotly)
 st.markdown("### 📈 Coeficientes Significativos del Modelo Logit")
-significant_params = logit_params[logit_pvalues < 0.05]
+significant_params = logit_params[logit_pvalues < 0.05].drop('const', errors='ignore')
 if not significant_params.empty:
     cleaned_significant_labels = clean_column_names(significant_params.index)
     fig_coef = px.bar(
