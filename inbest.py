@@ -36,6 +36,10 @@ def load_data(file_path):
 file_path = "bd_processed.csv"  # Cambia según la ubicación de tu archivo
 data = load_data(file_path)
 
+# Procesar nombres de columnas (limpiar "Fuente original de tráfico_" y corregir caracteres)
+def clean_column_names(columns):
+    return [col.split('_')[-1].replace("ñ", "ñ") for col in columns]
+
 # Filtros de unidades de negocio
 st.markdown("### Selecciona Unidades de Negocio")
 units = ['Cloud & AI Solutions', 'Enterprise Solutions']
@@ -92,15 +96,31 @@ fig_outcomes = px.pie(
 )
 st.plotly_chart(fig_outcomes, use_container_width=True)
 
+# Gráfico de barras: Comparación de fuentes de tráfico
+st.markdown("### 🌐 Comparación de Fuentes de Tráfico")
+traffic_columns = [col for col in data.columns if 'Fuente original de trafico' in col]
+traffic_counts = data[traffic_columns].sum()
+cleaned_labels = clean_column_names(traffic_columns)
+fig_traffic = px.bar(
+    x=cleaned_labels,
+    y=traffic_counts.values,
+    title="Número de Oportunidades por Fuente de Tráfico",
+    labels={"x": "Fuente", "y": "Cantidad"},
+    color=cleaned_labels,
+    color_discrete_sequence=px.colors.qualitative.Set2
+)
+st.plotly_chart(fig_traffic, use_container_width=True)
+
 # Gráfico de líneas: Tendencias temporales
 if "Fecha de creacion" in data.columns:
     st.markdown("### 📊 Tendencias Mensuales por Fuente de Tráfico")
     data['Fecha de creacion'] = pd.to_datetime(data['Fecha de creacion'], errors='coerce')
     data['Mes'] = data['Fecha de creacion'].dt.to_period('M')
-    monthly_data = data.groupby(['Mes'])[[
-        col for col in data.columns if 'Fuente original de trafico' in col]].sum().reset_index()
+    monthly_data = data.groupby(['Mes'])[traffic_columns].sum().reset_index()
     monthly_data['Mes'] = monthly_data['Mes'].astype(str)
-    chart = alt.Chart(monthly_data.melt(id_vars=['Mes'], var_name='Fuente', value_name='Oportunidades')).mark_line().encode(
+    melted_monthly_data = monthly_data.melt(id_vars=['Mes'], var_name='Fuente', value_name='Oportunidades')
+    melted_monthly_data['Fuente'] = clean_column_names(melted_monthly_data['Fuente'])
+    chart = alt.Chart(melted_monthly_data).mark_line().encode(
         x='Mes:T',
         y='Oportunidades:Q',
         color='Fuente:N'
@@ -123,8 +143,9 @@ logit_pvalues = logit_model.pvalues
 st.markdown("### 📈 Coeficientes Significativos del Modelo Logit")
 significant_params = logit_params[logit_pvalues < 0.05].drop('const', errors='ignore')
 if not significant_params.empty:
+    cleaned_significant_labels = clean_column_names(significant_params.index)
     fig, ax = plt.subplots()
-    sns.barplot(x=significant_params.values, y=significant_params.index, palette="Blues_r", ax=ax)
+    sns.barplot(x=significant_params.values, y=cleaned_significant_labels, palette="Blues_r", ax=ax)
     ax.set_title('Impacto de Variables Significativas', fontsize=16)
     ax.set_xlabel('Valor del Coeficiente', fontsize=14)
     ax.axvline(x=0, color='red', linestyle='--', linewidth=1)
@@ -147,26 +168,12 @@ ax_roc.set_title('Curva ROC - Modelo Logit', fontsize=16)
 ax_roc.legend(loc="lower right")
 st.pyplot(fig_roc)
 
-# Gráfico de barras: Comparación de fuentes de tráfico
-st.markdown("### 🌐 Comparación de Fuentes de Tráfico")
-traffic_columns = [col for col in data.columns if 'Fuente original de trafico' in col]
-traffic_counts = data[traffic_columns].sum()
-fig_traffic = px.bar(
-    x=traffic_counts.index,
-    y=traffic_counts.values,
-    title="Número de Oportunidades por Fuente de Tráfico",
-    labels={"x": "Fuente", "y": "Cantidad"},
-    color=traffic_counts.index,
-    color_discrete_sequence=px.colors.qualitative.Set2
-)
-st.plotly_chart(fig_traffic, use_container_width=True)
-
 # Exploración interactiva de variables
 st.markdown("### 🔍 Exploración de Impacto de Variables")
 if not significant_params.empty:
     selected_variable = st.selectbox("Selecciona una variable", significant_params.index)
     impact_value = significant_params[selected_variable]
-    st.markdown(f"**El impacto de {selected_variable} en la probabilidad de 'ganado' es:** {impact_value:.2f}")
+    st.markdown(f"**El impacto de `{selected_variable}` en la probabilidad de 'ganado' es:** `{impact_value:.2f}`")
 else:
     st.write("No hay variables significativas para explorar.")
 
