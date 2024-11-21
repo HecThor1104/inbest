@@ -5,6 +5,7 @@ from sklearn.metrics import roc_curve, auc
 import statsmodels.api as sm
 import seaborn as sns
 import plotly.express as px
+import plotly.graph_objects as go
 import altair as alt
 
 # Configuración de la página
@@ -111,26 +112,6 @@ fig_traffic = px.bar(
 )
 st.plotly_chart(fig_traffic, use_container_width=True)
 
-# Gráfico de líneas: Tendencias temporales
-if "Fecha de creacion" in data.columns:
-    st.markdown("### 📊 Tendencias Mensuales por Fuente de Tráfico")
-    data['Fecha de creacion'] = pd.to_datetime(data['Fecha de creacion'], errors='coerce')
-    data['Mes'] = data['Fecha de creacion'].dt.to_period('M')
-    monthly_data = data.groupby(['Mes'])[traffic_columns].sum().reset_index()
-    monthly_data['Mes'] = monthly_data['Mes'].astype(str)
-    melted_monthly_data = monthly_data.melt(id_vars=['Mes'], var_name='Fuente', value_name='Oportunidades')
-    melted_monthly_data['Fuente'] = clean_column_names(melted_monthly_data['Fuente'])
-    chart = alt.Chart(melted_monthly_data).mark_line().encode(
-        x='Mes:T',
-        y='Oportunidades:Q',
-        color='Fuente:N'
-    ).properties(
-        title="Tendencia Mensual de Oportunidades por Fuente",
-        width=800,
-        height=400
-    )
-    st.altair_chart(chart, use_container_width=True)
-
 # Modelo logit y coeficientes
 X = data[[col for col in data.columns if 'Fuente original de trafico' in col or 'Unidad de negocio asignada' in col]]
 X = sm.add_constant(X)
@@ -139,34 +120,42 @@ logit_model = sm.Logit(y, X).fit(disp=False)
 logit_params = logit_model.params
 logit_pvalues = logit_model.pvalues
 
-# Gráfico de coeficientes significativos
+# Gráfico de coeficientes significativos (diseño moderno con Plotly)
 st.markdown("### 📈 Coeficientes Significativos del Modelo Logit")
 significant_params = logit_params[logit_pvalues < 0.05].drop('const', errors='ignore')
 if not significant_params.empty:
     cleaned_significant_labels = clean_column_names(significant_params.index)
-    fig, ax = plt.subplots()
-    sns.barplot(x=significant_params.values, y=cleaned_significant_labels, palette="Blues_r", ax=ax)
-    ax.set_title('Impacto de Variables Significativas', fontsize=16)
-    ax.set_xlabel('Valor del Coeficiente', fontsize=14)
-    ax.axvline(x=0, color='red', linestyle='--', linewidth=1)
-    st.pyplot(fig)
+    fig_coef = px.bar(
+        x=significant_params.values,
+        y=cleaned_significant_labels,
+        orientation='h',
+        title="Impacto de Variables Significativas",
+        labels={"x": "Valor del Coeficiente", "y": "Variable"},
+        color=significant_params.values,
+        color_continuous_scale="Blues"
+    )
+    fig_coef.update_layout(coloraxis_showscale=False)
+    st.plotly_chart(fig_coef, use_container_width=True)
 else:
     st.write("No hay coeficientes significativos en el modelo.")
 
-# Curva ROC
+# Curva ROC (diseño moderno con Plotly)
 st.markdown("### 📉 Curva ROC del Modelo Logit")
 logit_pred_probs = logit_model.predict(X)
 fpr, tpr, thresholds = roc_curve(y, logit_pred_probs)
 roc_auc = auc(fpr, tpr)
 
-fig_roc, ax_roc = plt.subplots()
-sns.lineplot(x=fpr, y=tpr, label=f'ROC curve (area = {roc_auc:.2f})', ax=ax_roc, color="#1ABC9C")
-ax_roc.plot([0, 1], [0, 1], 'k--', label='Random guess', color="gray")
-ax_roc.set_xlabel('False Positive Rate', fontsize=14)
-ax_roc.set_ylabel('True Positive Rate', fontsize=14)
-ax_roc.set_title('Curva ROC - Modelo Logit', fontsize=16)
-ax_roc.legend(loc="lower right")
-st.pyplot(fig_roc)
+fig_roc = go.Figure()
+fig_roc.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f'ROC Curve (AUC = {roc_auc:.2f})', line=dict(color="#1ABC9C")))
+fig_roc.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name="Random Guess", line=dict(color="gray", dash='dash')))
+fig_roc.update_layout(
+    title="Curva ROC - Modelo Logit",
+    xaxis_title="False Positive Rate",
+    yaxis_title="True Positive Rate",
+    legend=dict(x=0.8, y=0.2),
+    template="plotly_white"
+)
+st.plotly_chart(fig_roc, use_container_width=True)
 
 # Exploración interactiva de variables
 st.markdown("### 🔍 Exploración de Impacto de Variables")
@@ -176,6 +165,7 @@ if not significant_params.empty:
     st.markdown(f"**El impacto de `{selected_variable}` en la probabilidad de 'ganado' es:** `{impact_value:.2f}`")
 else:
     st.write("No hay variables significativas para explorar.")
+
 
 
 
