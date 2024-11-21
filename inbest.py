@@ -26,7 +26,7 @@ plt.rcParams.update({
 })
 
 # Título del dashboard
-st.markdown("<h1 style='text-align: center; color: #4A4A4A;'>🎯 Análisis de Impacto de Fuentes de Oportunidades</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; color: #4A4A4A;'>🎯 Análisis de Marketing - iNBest</h1>", unsafe_allow_html=True)
 
 # Cargar datos
 @st.cache
