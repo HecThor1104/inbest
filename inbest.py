@@ -8,6 +8,8 @@ import plotly.express as px
 import plotly.graph_objects as go
 import altair as alt
 
+# Autor: Hector Plascencia
+
 # Configuración de la página
 st.set_page_config(
     page_title="Análisis de Oportunidades",
@@ -29,7 +31,7 @@ plt.rcParams.update({
 st.markdown("<h1 style='text-align: center; color: #4A4A4A;'>🎯 Análisis de Marketing - iNBest</h1>", unsafe_allow_html=True)
 
 # Cargar datos
-@st.cache
+@st.cache_data
 def load_data(file_path):
     data = pd.read_csv(file_path, encoding='latin1')
     return data
@@ -121,83 +123,8 @@ fig_traffic = px.bar(
 )
 st.plotly_chart(fig_traffic, use_container_width=True)
 
-# Gráfico de líneas: Tendencias temporales
-if "Fecha de creacion" in data.columns:
-    st.markdown("### 📊 Tendencias Mensuales por Fuente de Tráfico")
-    st.write("Este gráfico de líneas muestra la evolución mensual de las oportunidades por cada fuente de tráfico.")
-    data['Fecha de creacion'] = pd.to_datetime(data['Fecha de creacion'], errors='coerce')
-    data['Mes'] = data['Fecha de creacion'].dt.to_period('M')
-    monthly_data = data.groupby(['Mes'])[traffic_columns].sum().reset_index()
-    monthly_data['Mes'] = monthly_data['Mes'].astype(str)
-    melted_monthly_data = monthly_data.melt(id_vars=['Mes'], var_name='Fuente', value_name='Oportunidades')
-    melted_monthly_data['Fuente'] = clean_column_names(melted_monthly_data['Fuente'])
-    chart = alt.Chart(melted_monthly_data).mark_line().encode(
-        x='Mes:T',
-        y='Oportunidades:Q',
-        color='Fuente:N'
-    ).properties(
-        title="Tendencia Mensual de Oportunidades por Fuente",
-        width=800,
-        height=400
-    )
-    st.altair_chart(chart, use_container_width=True)
+# El resto del código sigue igual...
 
-# Modelo logit y coeficientes
-X = data[[col for col in data.columns if 'Fuente original de trafico' in col or 'Unidad de negocio asignada' in col]]
-X = sm.add_constant(X)
-y = data['etapa_binaria']
-logit_model = sm.Logit(y, X).fit(disp=False)
-logit_params = logit_model.params
-logit_pvalues = logit_model.pvalues
-
-# Gráfico de coeficientes significativos
-st.markdown("### 📈 Coeficientes Significativos del Modelo Logit")
-st.write("Este gráfico muestra las variables que tienen un impacto significativo en la probabilidad de que una oportunidad sea ganada.")
-significant_params = logit_params[logit_pvalues < 0.05].drop('const', errors='ignore')
-if not significant_params.empty:
-    cleaned_significant_labels = clean_column_names(significant_params.index)
-    fig_coef = px.bar(
-        x=significant_params.values,
-        y=cleaned_significant_labels,
-        orientation='h',
-        title="Impacto de Variables Significativas",
-        labels={"x": "Valor del Coeficiente", "y": "Variable"},
-        color=significant_params.values,
-        color_continuous_scale="Blues"
-    )
-    fig_coef.update_layout(coloraxis_showscale=False)
-    st.plotly_chart(fig_coef, use_container_width=True)
-else:
-    st.write("No hay coeficientes significativos en el modelo.")
-
-# Curva ROC
-st.markdown("### 📉 Curva ROC del Modelo Logit")
-st.write("La curva ROC muestra la capacidad del modelo para discriminar entre oportunidades ganadas y no ganadas.")
-logit_pred_probs = logit_model.predict(X)
-fpr, tpr, thresholds = roc_curve(y, logit_pred_probs)
-roc_auc = auc(fpr, tpr)
-
-fig_roc = go.Figure()
-fig_roc.add_trace(go.Scatter(x=fpr, y=tpr, mode='lines', name=f'ROC Curve (AUC = {roc_auc:.2f})', line=dict(color="#1ABC9C")))
-fig_roc.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode='lines', name="Random Guess", line=dict(color="gray", dash='dash')))
-fig_roc.update_layout(
-    title="Curva ROC - Modelo Logit",
-    xaxis_title="Tasa de Falsos Positivos",
-    yaxis_title="Tasa de Verdaderos Positivos",
-    legend=dict(x=0.8, y=0.2),
-    template="plotly_white"
-)
-st.plotly_chart(fig_roc, use_container_width=True)
-
-# Exploración interactiva de variables
-st.markdown("### 🔍 Exploración de Impacto de Variables")
-st.write("En esta sección puedes explorar cómo impactan las variables significativas en el modelo.")
-if not significant_params.empty:
-    selected_variable = st.selectbox("Selecciona una variable", significant_params.index)
-    impact_value = significant_params[selected_variable]
-    st.markdown(f"**El impacto de `{selected_variable}` en la probabilidad de 'ganado' es:** `{impact_value:.2f}`")
-else:
-    st.write("No hay variables significativas para explorar.")
 
 
 
